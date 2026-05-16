@@ -157,7 +157,11 @@ func (s *StyleSheet) readProperty(prop string, cssParser *css.Parser, window hel
 		Property: prop,
 		Values:   make([]PropertyValue, 0),
 	}
+	foundExistingVar := false
 	for _, val := range cssParser.Values() {
+		if foundExistingVar {
+			break
+		}
 		switch val.TokenType {
 		case css.FunctionToken:
 			s.stateFuncDepth++
@@ -178,19 +182,22 @@ func (s *StyleSheet) readProperty(prop string, cssParser *css.Parser, window hel
 				last := &r.Values[len(r.Values)-1]
 				str := string(val.Data)
 				if last.Str == "var" {
+					v, ok := s.CustomVars[str]
+					if !ok {
+						continue
+					}
+					foundExistingVar = true
 					r.Values = r.Values[0 : len(r.Values)-1]
 					if len(r.Values) > 0 {
 						last = &r.Values[len(r.Values)-1]
 					}
-					if v, ok := s.CustomVars[str]; ok {
-						for i := range v {
-							if s.stateFuncDepth > 1 {
-								last.Args = append(last.Args, v[i])
-							} else {
-								r.Values = append(r.Values, PropertyValue{
-									Str: v[i],
-								})
-							}
+					for i := range v {
+						if s.stateFuncDepth > 1 {
+							last.Args = append(last.Args, v[i])
+						} else {
+							r.Values = append(r.Values, PropertyValue{
+								Str: v[i],
+							})
 						}
 					}
 				} else {

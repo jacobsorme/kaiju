@@ -46,6 +46,12 @@ const testCSSVarDeclare = `:root { --ed-menu-bar-height: 24px; }
 .test { height: var(--ed-menu-bar-height); }`
 const testCSSVarInCalc = `:root { --ed-menu-bar-height: 24px; }
 .test { height: calc(100% - var(--ed-menu-bar-height)); }`
+const testCSSVarInCalcMultiple1 = `:root { --ed-menu-bar-height: 24px; }
+.test { height: calc(100% - var(--not-existing, --ed-menu-bar-height)); }`
+const testCSSVarInCalcMultiple2 = `:root { --ed-menu-bar-height: 24px; }
+.test { height: calc(100% - var(--not-existing1, --not-existing2, --ed-menu-bar-height)); }`
+const testCSSVarInCalcMultiple3 = `:root { --ed-menu-bar-height: 24px; --other: 200px; }
+.test { height: calc(100% - var(--not-existing1, --ed-menu-bar-height, --other)); }`
 
 type dummyWindow struct{}
 
@@ -186,40 +192,56 @@ func TestParseVariable(t *testing.T) {
 }
 
 func TestParseCalcAndVariable(t *testing.T) {
-	s := NewStyleSheet()
-	s.Parse(testCSSVarInCalc, dummyWindow{})
-	if len(s.Groups) != 2 {
-		t.FailNow()
-	}
-	if len(s.CustomVars) != 1 {
-		t.FailNow()
-	}
-	if v, ok := s.CustomVars["--ed-menu-bar-height"]; !ok {
-		t.FailNow()
-	} else if len(v) != 1 {
-		t.FailNow()
-	} else if v[0] != "24px" {
-		t.FailNow()
-	}
-	if len(s.Groups[1].Rules) != 1 {
-		t.FailNow()
-	}
-	if s.Groups[1].Rules[0].Property != "height" {
-		t.FailNow()
-	}
-	if len(s.Groups[1].Rules[0].Values) != 1 {
-		t.FailNow()
-	}
-	if s.Groups[1].Rules[0].Values[0].Str != "calc" {
-		t.FailNow()
-	}
-	if len(s.Groups[1].Rules[0].Values[0].Args) != 3 {
-		t.FailNow()
-	}
-	expectedArgs := []string{"100%", "-", "24px"}
-	for i := range expectedArgs {
-		if s.Groups[1].Rules[0].Values[0].Args[i] != expectedArgs[i] {
-			t.FailNow()
+	test := func(css string, customVars int) func(t *testing.T) {
+		return func(t *testing.T) {
+			s := NewStyleSheet()
+			s.Parse(css, dummyWindow{})
+			if len(s.Groups) != 2 {
+				t.FailNow()
+			}
+			if len(s.CustomVars) != customVars {
+				t.FailNow()
+			}
+			if v, ok := s.CustomVars["--ed-menu-bar-height"]; !ok {
+				t.FailNow()
+			} else if len(v) != 1 {
+				t.FailNow()
+			} else if v[0] != "24px" {
+				t.FailNow()
+			}
+			if len(s.Groups[1].Rules) != 1 {
+				t.FailNow()
+			}
+			if s.Groups[1].Rules[0].Property != "height" {
+				t.FailNow()
+			}
+			if len(s.Groups[1].Rules[0].Values) != 1 {
+				t.FailNow()
+			}
+			if s.Groups[1].Rules[0].Values[0].Str != "calc" {
+				t.FailNow()
+			}
+			if len(s.Groups[1].Rules[0].Values[0].Args) != 3 {
+				t.FailNow()
+			}
+			expectedArgs := []string{"100%", "-", "24px"}
+			for i := range expectedArgs {
+				if s.Groups[1].Rules[0].Values[0].Args[i] != expectedArgs[i] {
+					t.FailNow()
+				}
+			}
 		}
 	}
+	t.Run("testSingleVar", func(t *testing.T) func(*testing.T) {
+		return test(testCSSVarInCalc, 1)
+	}(t))
+	t.Run("testMultiVar1", func(t *testing.T) func(*testing.T) {
+		return test(testCSSVarInCalcMultiple1, 1)
+	}(t))
+	t.Run("testMultiVar2", func(t *testing.T) func(*testing.T) {
+		return test(testCSSVarInCalcMultiple2, 1)
+	}(t))
+	t.Run("testMultiVar3", func(t *testing.T) func(*testing.T) {
+		return test(testCSSVarInCalcMultiple3, 2)
+	}(t))
 }
